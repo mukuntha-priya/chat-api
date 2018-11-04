@@ -54,16 +54,14 @@ def add_users_to_group(group, user_ids):
         group.users.add(user)
 
 
-# http://localhost:8000/slack/messages/dm?userId=3
-def get_direct_message_list(request):
-    user_id = request.GET["userId"]
+# http://localhost:8000/slack/messages/dm/user/3
+def get_direct_message_list(request, user_id):
     direct_messages = DirectMessage.objects.filter(Q(user1__id=user_id) | Q(user2__id=user_id))
     return HttpResponse(to_json(direct_messages))
 
 
-# http://localhost:8000/slack/messages/groups?userId=3
-def get_group_list(request):
-    user_id = request.GET["userId"]
+# http://localhost:8000/slack/messages/groups/user/3
+def get_group_list(request, user_id):
     groups = Group.objects.filter(users__id=user_id)
     return HttpResponse(to_json(groups))
 
@@ -78,6 +76,19 @@ def get_direct_messages(request, dm_id):
 def get_group_messages(request, group_id):
     messages = Message.objects.filter(group__id=group_id)
     return HttpResponse(to_json(messages))
+
+
+# http://localhost:8000/slack/messages/dm?user1=x&user2=y
+def get_direct_message(request):
+    user_id1 = request.GET['user1']
+    user_id2 = request.GET['user2']
+    direct_message = DirectMessage.objects.filter((Q(user1__id=user_id1) & Q(user2__id=user_id2)) |
+                                                  (Q(user2__id=user_id1) & Q(user1__id=user_id2)))
+    if len(direct_message) > 0:
+        return HttpResponse(direct_message.values())
+    dm = DirectMessage.objects.create(user1=User.objects.get(id=user_id1),
+                                      user2=User.objects.get(id=user_id2))
+    return HttpResponse(dm.values())
 
 
 # http://localhost:8000/slack/messages/add

@@ -11,8 +11,8 @@ class User(models.Model):
 
 
 class DirectMessage(models.Model):
-    user1 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_1')
-    user2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_2')
+    user1 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user1')
+    user2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user2')
 
     def __str__(self):
         return self.user1.name + self.user2.name
@@ -32,3 +32,15 @@ class Message(models.Model):
     sender = models.ForeignKey(User, on_delete=models.CASCADE)
     direct_message = models.ForeignKey(DirectMessage, on_delete=models.CASCADE, null=True)
     group = models.ForeignKey(Group, on_delete=models.CASCADE, null=True)
+
+
+class DirectMessageHistory:
+    direct_message = models.ForeignKey(DirectMessage, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    last_seen_message = models.ForeignKey(Message, on_delete=models.CASCADE)
+
+
+class GroupHistory:
+    group = models.ForeignKey(DirectMessage, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    last_seen_message = models.ForeignKey(Message, on_delete=models.CASCADE)

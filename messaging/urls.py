@@ -14,6 +14,7 @@ urlpatterns = [
     path('messages/groups/<int:group_id>', views.get_group_messages, name='get_group_messages'),
     path('messages/add', views.add_message, name='add_message'),
     path('messages/dm', views.get_direct_message, name='get_direct_message'),
+    path('anonymous.jpg', views.get_image, name='get_image'),
 ]
 
 

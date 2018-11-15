@@ -1,10 +1,13 @@
+import os
+
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q
 import json
 
-from messaging.serializers import UserSerializer, GroupSerializer, DirectMessageSerializer, MessageSerializer
-from .models import User, Message, Group, DirectMessage
+from messaging.serializers import UserSerializer, GroupSerializer, DirectMessageSerializer, MessageSerializer, \
+    DirectMessageHistorySerializer, GroupHistorySerializer
+from .models import User, Message, Group, DirectMessage, DirectMessageHistory, GroupHistory
 
 
 # Create your views here.
@@ -65,27 +68,69 @@ def add_users_to_group(group, user_ids):
 # http://localhost:8000/slack/messages/dm/user/3
 def get_direct_message_list(request, user_id):
     direct_messages = DirectMessage.objects.filter(Q(user1__id=user_id) | Q(user2__id=user_id))
-    serializer = DirectMessageSerializer(direct_messages, many=True)
+    direct_messages_history = []
+    for dm in direct_messages:
+            history = DirectMessageHistory.objects.filter(direct_message=dm, user__id=user_id)
+            if len(history) > 0:
+                direct_messages_history.append(history[0])
+            else:
+                user = User.objects.get(id=user_id)
+                direct_messages_history.append(DirectMessageHistory(direct_message=dm, user=user, last_seen_message=None))
+    serializer = DirectMessageHistorySerializer(direct_messages_history, many=True)
     return JsonResponse(serializer.data, safe=False)
 
 
 # http://localhost:8000/slack/messages/groups/user/3
 def get_group_list(request, user_id):
     groups = Group.objects.filter(users__id=user_id)
-    serializer = GroupSerializer(groups, many=True)
+    group_history = []
+    for group in groups:
+        history = GroupHistory.objects.filter(group=group, user__id=user_id)
+        if len(history) > 0:
+            group_history.append(history[0])
+        else:
+            user = User.objects.get(id=user_id)
+            group_history.append(GroupHistory(group=group, user=user, last_seen_message=None))
+    serializer = GroupHistorySerializer(group_history, many=True)
     return JsonResponse(serializer.data, safe=False)
 
 
 # http://localhost:8000/slack/messages/dm/3?user=x
 def get_direct_messages(request, dm_id):
-    messages = Message.objects.filter(direct_message__id=dm_id)
+    last_seen_message = None
+    messages = Message.objects.filter(direct_message__id=dm_id).order_by('-created_at')
+    if len(messages) > 0:
+        last_seen_message = messages[0]
+    history = DirectMessageHistory.objects.filter(direct_message__id=dm_id, user__id=request.GET['user'])
+    if len(history) > 0:
+        history.update(last_seen_message=last_seen_message)
+    else:
+        user = User.objects.get(id=request.GET['user'])
+        direct_message = DirectMessage.objects.get(id=dm_id)
+        history = DirectMessageHistory(user=user, direct_message=direct_message, last_seen_message=last_seen_message)
+        history.save()
+
+    messages = Message.objects.filter(direct_message__id=dm_id).order_by('created_at')
     serializer = MessageSerializer(messages, many=True)
     return JsonResponse(serializer.data, safe=False)
 
 
 # http://localhost:8000/slack/messages/groups/3?user=x
 def get_group_messages(request, group_id):
-    messages = Message.objects.filter(group__id=group_id)
+    last_seen_message = None
+    messages = Message.objects.filter(group__id=group_id).order_by('-created_at')
+    if len(messages) > 0:
+        last_seen_message = messages[0]
+    history = GroupHistory.objects.filter(group__id=group_id, user__id=request.GET['user'])
+    if len(history) > 0:
+        history.update(last_seen_message=last_seen_message)
+    else:
+        user = User.objects.get(id=request.GET['user'])
+        group = Group.objects.get(id=group_id)
+        history = GroupHistory(user=user, group=group, last_seen_message=last_seen_message)
+        history.save()
+
+    messages = Message.objects.filter(group__id=group_id).order_by('created_at')
     serializer = MessageSerializer(messages, many=True)
     return JsonResponse(serializer.data, safe=False)
 
@@ -97,7 +142,7 @@ def get_direct_message(request):
     direct_message = DirectMessage.objects.filter((Q(user1__id=user_id1) & Q(user2__id=user_id2)) |
                                                   (Q(user2__id=user_id1) & Q(user1__id=user_id2)))
     if len(direct_message) > 0:
-        serializer = DirectMessageSerializer(direct_message)
+        serializer = DirectMessageSerializer(direct_message[0])
         return JsonResponse(serializer.data, safe=False)
     dm = DirectMessage.objects.create(user1=User.objects.get(id=user_id1),
                                       user2=User.objects.get(id=user_id2))
@@ -110,15 +155,25 @@ def get_direct_message(request):
 @csrf_exempt
 def add_message(request):
     data = json.loads(request.body.decode("utf-8"))
-    sender = User.objects.get(id=data['userId'])
+    user_id = data['userId']
+    sender = User.objects.get(id=user_id)
     content = data['content']
     if data['directMessageId'] is not None:
         dm = DirectMessage.objects.get(id=data['directMessageId'])
         message = Message(sender=sender, content=content, direct_message=dm)
+        message.save()
+        DirectMessageHistory.objects.filter(direct_message=dm, user__id=user_id).update(last_seen_message=message)
     else:
         group = Group.objects.get(id=data['groupId'])
         message = Message(sender=sender, content=content, group=group)
-    message.save()
+        message.save()
+        GroupHistory.objects.filter(group=group, user__id=user_id).update(last_seen_message=message)
     serializer = MessageSerializer(message)
     return JsonResponse(serializer.data, safe=False)
 
+
+def get_image(request):
+    module_dir = os.path.dirname(__file__)  # get current directory
+    file_path = os.path.join(module_dir, 'anonymous.jpg')
+    image_data = open(file_path, "rb").read()
+    return HttpResponse(image_data, content_type="image/jpeg")

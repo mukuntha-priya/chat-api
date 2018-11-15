@@ -34,13 +34,13 @@ class Message(models.Model):
     group = models.ForeignKey(Group, on_delete=models.CASCADE, null=True)
 
 
-class DirectMessageHistory:
+class DirectMessageHistory(models.Model):
     direct_message = models.ForeignKey(DirectMessage, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    last_seen_message = models.ForeignKey(Message, on_delete=models.CASCADE)
+    last_seen_message = models.ForeignKey(Message, on_delete=models.CASCADE, null=True)
 
 
-class GroupHistory:
-    group = models.ForeignKey(DirectMessage, on_delete=models.CASCADE)
+class GroupHistory(models.Model):
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    last_seen_message = models.ForeignKey(Message, on_delete=models.CASCADE)
+    last_seen_message = models.ForeignKey(Message, on_delete=models.CASCADE, null=True)

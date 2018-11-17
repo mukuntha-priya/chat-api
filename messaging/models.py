@@ -32,6 +32,7 @@ class Message(models.Model):
     sender = models.ForeignKey(User, on_delete=models.CASCADE)
     direct_message = models.ForeignKey(DirectMessage, on_delete=models.CASCADE, null=True)
     group = models.ForeignKey(Group, on_delete=models.CASCADE, null=True)
+    thread_id = models.IntegerField(null=True)
 
 
 class DirectMessageHistory(models.Model):

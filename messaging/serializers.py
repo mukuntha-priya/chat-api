@@ -33,7 +33,7 @@ class MessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Message
-        fields = ('id', 'content', 'created_at', 'sender', 'direct_message', 'group')
+        fields = ('id', 'content', 'created_at', 'sender', 'direct_message', 'group', 'thread_id')
 
 
 class DirectMessageHistorySerializer(serializers.ModelSerializer):

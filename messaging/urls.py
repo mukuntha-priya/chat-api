@@ -15,6 +15,8 @@ urlpatterns = [
     path('messages/add', views.add_message, name='add_message'),
     path('messages/dm', views.get_direct_message, name='get_direct_message'),
     path('anonymous.jpg', views.get_image, name='get_image'),
+    path('messages/thread', views.create_thread, name='create_thread'),
+    path('messages/thread/add', views.add_to_thread, name='add_to_thread'),
 ]
 
 

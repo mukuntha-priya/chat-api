@@ -155,21 +155,57 @@ def get_direct_message(request):
 @csrf_exempt
 def add_message(request):
     data = json.loads(request.body.decode("utf-8"))
+    message = create_message(data, None)
+    serializer = MessageSerializer(message)
+    return JsonResponse(serializer.data, safe=False)
+
+
+# http://localhost:8000/slack/messages/thread
+# (POST: { "userId": 1, "content": "Another one", "groupId": null, "directMessageId": 1, "originalMessageId": 1 })
+@csrf_exempt
+def create_thread(request):
+    data = json.loads(request.body.decode("utf-8"))
+    thread_id = get_new_thread_id()
+    message = create_message(data, thread_id)
+    original_message_id = data['originalMessageId']
+    Message.objects.filter(id=original_message_id).update(thread_id=thread_id)
+    serializer = MessageSerializer(message)
+    return JsonResponse(serializer.data, safe=False)
+
+
+# http://localhost:8000/slack/messages/thread/add
+# (POST: { "userId": 1, "content": "Another one", "groupId": null, "directMessageId": 1, "threadId": 1 })
+@csrf_exempt
+def add_to_thread(request):
+    data = json.loads(request.body.decode("utf-8"))
+    message = create_message(data, data['threadId'])
+    serializer = MessageSerializer(message)
+    return JsonResponse(serializer.data, safe=False)
+
+
+def create_message(data, thread_id):
     user_id = data['userId']
     sender = User.objects.get(id=user_id)
     content = data['content']
     if data['directMessageId'] is not None:
         dm = DirectMessage.objects.get(id=data['directMessageId'])
-        message = Message(sender=sender, content=content, direct_message=dm)
+        message = Message(sender=sender, content=content, direct_message=dm, thread_id=thread_id)
         message.save()
         DirectMessageHistory.objects.filter(direct_message=dm, user__id=user_id).update(last_seen_message=message)
     else:
         group = Group.objects.get(id=data['groupId'])
-        message = Message(sender=sender, content=content, group=group)
+        message = Message(sender=sender, content=content, group=group, thread_id=thread_id)
         message.save()
         GroupHistory.objects.filter(group=group, user__id=user_id).update(last_seen_message=message)
-    serializer = MessageSerializer(message)
-    return JsonResponse(serializer.data, safe=False)
+    return message
+
+
+def get_new_thread_id():
+    message = Message.objects.latest('thread_id')
+    if message is not None:
+        if message.thread_id is not None:
+            return message.thread_id + 1
+    return 1
 
 
 def get_image(request):
